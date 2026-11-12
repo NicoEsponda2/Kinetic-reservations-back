@@ -1,0 +1,10 @@
+node_modules
+dist
+postgres
+.git
+.gitignore
+.vscode
+*.md
+*.tsbuildinfo
+npm-debug.log*
+

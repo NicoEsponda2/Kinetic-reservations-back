@@ -28,7 +28,14 @@ const currentDirectory = dirname(fileURLToPath(import.meta.url));
       username: process.env.DB_USERNAME,
       password: process.env.DB_PASSWORD,
       autoLoadEntities: true,
-      synchronize: process.env.NODE_ENV !== 'production', // no usar en produccion, solo para desarrollo
+      synchronize:
+        process.env.DB_SYNCHRONIZE === 'true' ||
+        process.env.NODE_ENV !== 'production',
+      extra: {
+        max: 5,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 5000,
+      },
     }),
 
     ServeStaticModule.forRoot({

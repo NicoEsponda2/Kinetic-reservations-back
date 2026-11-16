@@ -8,7 +8,8 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 # ==========================================
-# Etapa 2: Tester (Pruebas unitarias - Opcional)
+# Etapa 2: Tester (Pruebas unitarias y de seguridad obligatorias)
+# Si algún test falla, el build se detiene antes de publicar la imagen.
 # ==========================================
 FROM dependencies AS tester
 WORKDIR /app
@@ -16,13 +17,12 @@ COPY . .
 RUN npm run test
 
 # ==========================================
-# Etapa 3: Builder (Compilación limpia)
-# Hereda directamente de dependencies para ahorrar RAM en GCP
+# Etapa 3: Builder (Compilación limpia con límite de memoria)
+# Hereda de tester para garantizar que solo código validado llegue a producción.
 # ==========================================
-FROM dependencies AS builder
+FROM tester AS builder
 WORKDIR /app
-COPY . .
-RUN npm run build
+RUN NODE_OPTIONS="--max-old-space-size=512" npm run build
 # Eliminamos dependencias de desarrollo para aligerar el tamaño final
 RUN npm prune --omit=dev
 
@@ -54,4 +54,4 @@ USER node
 
 EXPOSE 3000
 
-CMD ["node", "dist/main.js"]
+CMD ["node", "--max-old-space-size=256", "dist/main.js"]

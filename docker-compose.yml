@@ -1,9 +1,10 @@
-name: kinetic-reservations-back
+# docker-compose.yml (Desarrollo Local)
+name: kinetic-reservations-dev
 
 services:
   db:
-    image: postgres:14.3
-    container_name: kinetic-reservations-db
+    image: postgres:14-alpine
+    container_name: kinetic-reservations-db-dev
     restart: always
     ports:
       - "127.0.0.1:5432:5432"
@@ -17,8 +18,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: development
-    container_name: kinetic-reservations-back
+      target: development # <--- Apunta a desarrollo local
+    container_name: kinetic-reservations-back-dev
     restart: always
     ports:
       - "3000:3000"

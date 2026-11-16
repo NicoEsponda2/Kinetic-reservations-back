@@ -1,0 +1,46 @@
+name: CI/CD Deploy to GCP VM
+
+on:
+  push:
+    branches:
+      - main # Se ejecuta automáticamente cuando subas cambios a main
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v3
+
+      - name: Iniciar sesión en Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Construir y subir imagen de Docker
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./Dockerfile
+          target: production # Usa la etapa optimizada de producción
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/kinetic-reservations-back:latest
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Desplegar en la VM de GCP por SSH
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.GCP_VM_IP }} # La IP externa de tu VM gratuita
+          username: ${{ secrets.GCP_VM_USER }} # Tu usuario SSH de la VM
+          key: ${{ secrets.GCP_SSH_KEY }} # Tu llave privada SSH
+          script: |
+            cd /ruta/de/tu/proyecto/en/la/vm
+            # Descargar la nueva imagen de Docker Hub
+            docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+            docker compose -f docker-compose.prod.yml pull
+            # Reiniciar los contenedores con los cambios
+            docker compose -f docker-compose.prod.yml up -d

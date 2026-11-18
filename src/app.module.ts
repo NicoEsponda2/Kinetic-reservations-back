@@ -14,6 +14,7 @@ import { BookingsModule } from './modules/bookings/bookings.module.js';
 import { PaymentsModule } from './modules/payments/payments.module.js';
 import { SportsSchedulesModule } from './modules/sports-schedules/sports-schedules.module.js';
 import { UserModule } from './modules/user/user.module.js';
+import { MessageWsModule } from './message-ws/message-ws.module.js';
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 
@@ -61,6 +62,8 @@ const currentDirectory = dirname(fileURLToPath(import.meta.url));
     PaymentsModule,
 
     UserModule,
+
+    MessageWsModule,
   ],
 })
 export class AppModule {}

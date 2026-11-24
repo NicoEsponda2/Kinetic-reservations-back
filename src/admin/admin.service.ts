@@ -11,6 +11,7 @@ import { CourtEntity } from '../modules/courts/entities/court.entity.js';
 import { SportsScheduleEntity } from '../modules/sports-schedules/entities/sports-schedule.entity.js';
 import { CommentsEntity } from '../modules/comments/entities/comment.entity.js';
 import { UserEntity } from '../auth/entities/user.entity.js';
+import { getBusinessDateTime } from '../common/utils/business-time.util.js';
 
 export interface DailyTrendPoint {
   fecha: string;
@@ -125,9 +126,10 @@ export class AdminService {
         monto: Number(r.precio_cobrado) || 0,
       }));
 
-      // Determinamos la fecha de referencia (hoy, o la fecha más reciente con actividad si los datos son de seed)
-      const hoyDate = new Date();
-      const hoyIso = this.formatIsoDate(hoyDate);
+      // Fecha y hora real actual en la zona horaria comercial (America/Santiago)
+      const { date: hoyIso, time: horaActualChile } = getBusinessDateTime();
+      const ahoraMinutos = this.timeToMinutes(horaActualChile);
+
       const hayReservasHoy = reservasNormalizadas.some(
         (r) => r.fechaStr === hoyIso,
       );
@@ -154,7 +156,12 @@ export class AdminService {
       >();
       const reservasPorPista = new Map<
         number,
-        { hoy: number; totales: number; ocupadaAhora: boolean }
+        {
+          hoy: number;
+          totales: number;
+          ocupadaAhora: boolean;
+          turnosVigentesHoy: number;
+        }
       >();
 
       for (const item of reservasNormalizadas) {
@@ -184,29 +191,36 @@ export class AdminService {
             ingresosMesAnterior += monto;
             reservasMesAnterior += 1;
           }
+        } else if (esPendiente) {
+          pagosPendientes += 1;
+        }
 
-          // Estadísticas por pista
+        // Estadísticas reales por pista (excluyendo reservas canceladas)
+        if (!esCancelada) {
           const idPista = raw.id_pista || raw.pista?.id_pista;
           if (idPista) {
             const actualPista = reservasPorPista.get(idPista) ?? {
               hoy: 0,
               totales: 0,
               ocupadaAhora: false,
+              turnosVigentesHoy: 0,
             };
             actualPista.totales += 1;
-            if (fechaStr === ranges.fechaActual) {
+            if (fechaStr === hoyIso) {
               actualPista.hoy += 1;
-              if (
-                raw.hora_inicio <= ranges.horaActual &&
-                raw.hora_termino > ranges.horaActual
-              ) {
+              const inicioMin = this.timeToMinutes(raw.hora_inicio);
+              const terminoMin = raw.hora_termino
+                ? this.timeToMinutes(raw.hora_termino)
+                : inicioMin + 60;
+              if (inicioMin <= ahoraMinutos && ahoraMinutos < terminoMin) {
                 actualPista.ocupadaAhora = true;
+              }
+              if (terminoMin > ahoraMinutos) {
+                actualPista.turnosVigentesHoy += 1;
               }
             }
             reservasPorPista.set(idPista, actualPista);
           }
-        } else if (esPendiente) {
-          pagosPendientes += 1;
         }
 
         // Acumulación para el gráfico de tendencia
@@ -233,12 +247,9 @@ export class AdminService {
         reservasMesAnterior,
       );
 
-      // 2. Estado de Pistas y Tasa de Ocupación
+      // 2. Estado real de Pistas (según reservas activas del día de hoy) y Tasa de Ocupación
       const pistasActivas = pistas.filter(
         (p) => p.is_active && p.servicio?.is_active !== false,
-      );
-      const hayAlgunaEnCursoAhora = Array.from(reservasPorPista.values()).some(
-        (v) => v.ocupadaAhora,
       );
 
       const estadoPistas = pistasActivas.map((c) => {
@@ -246,10 +257,9 @@ export class AdminService {
           hoy: 0,
           totales: 0,
           ocupadaAhora: false,
+          turnosVigentesHoy: 0,
         };
-        const isOcupada = hayAlgunaEnCursoAhora
-          ? stats.ocupadaAhora
-          : stats.hoy > 0 || stats.totales > 0;
+        const isOcupada = stats.ocupadaAhora || stats.turnosVigentesHoy > 0;
 
         return {
           id_pista: c.id_pista,
@@ -561,6 +571,18 @@ export class AdminService {
   private parseIsoDate(iso: string): Date {
     const [y, m, d] = iso.split('-').map(Number);
     return new Date(y, (m || 1) - 1, d || 1, 12, 0, 0);
+  }
+
+  /**
+   * Convierte una hora `HH:mm` o `HH:mm:ss` al total de minutos desde medianoche.
+   *
+   * @param timeVal Hora de referencia.
+   * @returns Minutos totales desde las 00:00.
+   */
+  private timeToMinutes(timeVal: string | undefined | null): number {
+    if (!timeVal) return 0;
+    const [h, m] = String(timeVal).trim().split(':');
+    return (Number(h) || 0) * 60 + (Number(m) || 0);
   }
 
   /**

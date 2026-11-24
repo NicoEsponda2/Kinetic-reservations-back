@@ -41,8 +41,10 @@ export class BookingsService {
         },
         select: {
           id_reserva: true,
+          id_pista: true,
           fecha: true,
           hora_inicio: true,
+          hora_termino: true,
           precio_cobrado: true,
           estado: true,
           usuario: {
@@ -68,11 +70,13 @@ export class BookingsService {
 
       const data = reservas.map((reserva) => ({
         id_reserva: reserva.id_reserva,
+        id_pista: reserva.id_pista ?? reserva.pista?.id_pista,
         fecha:
           typeof reserva.fecha === 'string'
             ? reserva.fecha
             : reserva.fecha.toISOString().split('T')[0],
         hora_inicio: reserva.hora_inicio,
+        hora_termino: reserva.hora_termino,
         precio_cobrado: reserva.precio_cobrado,
         estado: reserva.estado,
         pista: reserva.pista?.nombre,
